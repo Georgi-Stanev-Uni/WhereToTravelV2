@@ -1,0 +1,59 @@
+# WhereToTravel
+
+## Идея
+
+WhereToTravel е проста Android приложение за планиране на пътувания.
+Потребителят може да записва места, които иска да посети, да ги вижда на карта,
+да маркира кои вече са посетени и да ги управлява чрез удобен списък.
+
+## Как работи (user flow)
+
+1. При стартиране се показва списък с **места за посещение**.
+2. С бутон `!` в долния десен ъгъл се отваря меню:
+   - **Add** – създаване на ново място (име, описание, координати).
+   - **Visited** – екран с вече посетените места.
+   - **Map** – карта с всички места като маркери.
+3. От основния списък:
+   - **Mark visited** премества мястото в екрана „Visited“.
+   - **Edit** отваря диалог за редакция.
+   - **Delete** изтрива мястото.
+4. В екрана **Visited**:
+   - **Unvisit** връща мястото обратно в основния списък.
+   - **Delete** го изтрива окончателно.
+5. В екрана **Map**:
+   - Показва се текущата GPS локация на устройството (ако е даден permission).
+   - Всички места се виждат като маркери на картата.
+
+## Архитектура
+
+- Архитектурен стил: **MVVM + Repository**
+- Слоеве:
+  - `data.local` – Room:
+    - `PlaceEntity` – таблица `places` (`id, name, description, latitude, longitude, visited`)
+    - `PlaceDao` – CRUD заявки
+    - `AppDatabase` – RoomDatabase, `version = 2`
+  - `data.repository`:
+    - `PlaceRepository` (interface)
+    - `PlaceRepositoryImpl` (имплементация върху `PlaceDao`)
+  - `ui`:
+    - `PlacesViewModel` – бизнес логика, Flow от `PlacesUiState`
+    - `ui.screens.list` – `PlacesListScreen`, `VisitedPlacesScreen`, `PlaceDialog`
+    - `ui.screens.map` – `PlacesMapScreen`
+    - `ui.theme` – Material 3 тема (light/dark)
+- DI:
+  - Прост `AppContainer` (в `di`) създава `AppDatabase` и `PlaceRepository`
+  - `WhereToTravelApp : Application` държи `container`
+  - `MainActivity` взима `PlacesViewModel` чрез `viewModels { PlacesViewModelFactory(...) }`
+
+## Потребителски поток
+
+1. **MainActivity → PlacesListScreen**
+   - Потребителят вижда списък с непосетени места.
+2. От FAB менюто:
+   - **Add** → диалог за създаване.
+   - **Visited** → `VisitedPlacesScreen`.
+   - **Map** → `PlacesMapScreen`.
+3. В `VisitedPlacesScreen` може да върне място обратно или да го изтрие.
+4. В `PlacesMapScreen` потребителят вижда:
+   - собствената си локация;
+   - всички места като маркери

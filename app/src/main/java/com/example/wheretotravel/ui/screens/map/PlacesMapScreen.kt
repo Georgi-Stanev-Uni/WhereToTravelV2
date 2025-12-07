@@ -24,7 +24,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 
-@SuppressLint("MissingPermission") // ние проверяваме permission-а преди да ползваме локацията
+@SuppressLint("MissingPermission") // we check permission before enabling location
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlacesMapScreen(
@@ -34,7 +34,12 @@ fun PlacesMapScreen(
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
 
-    // 1) Runtime permission state
+    // only places with coordinates
+    val placesWithCoords = remember(state.places) {
+        state.places.filter { it.latitude != null && it.longitude != null }
+    }
+
+    // 1) Runtime permission
     var isLocationPermissionGranted by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -43,7 +48,6 @@ fun PlacesMapScreen(
         isLocationPermissionGranted = granted
     }
 
-    // Проверка / искане на permission при отваряне на екрана
     LaunchedEffect(Unit) {
         val grantedFine = ContextCompat.checkSelfPermission(
             context,
@@ -62,7 +66,7 @@ fun PlacesMapScreen(
         }
     }
 
-    // 2) Текуща позиция на устройството
+    // 2) User location
     var userLocation by remember { mutableStateOf<LatLng?>(null) }
 
     LaunchedEffect(isLocationPermissionGranted) {
@@ -76,10 +80,10 @@ fun PlacesMapScreen(
         }
     }
 
-    // 3) Начална позиция на камерата
-    val fallbackPosition = state.places.firstOrNull()?.let {
-        LatLng(it.latitude, it.longitude)
-    } ?: LatLng(42.6977, 23.3219) // София по подразбиране
+    // 3) Initial camera position
+    val fallbackPosition = placesWithCoords.firstOrNull()?.let {
+        LatLng(it.latitude!!, it.longitude!!)
+    } ?: LatLng(42.6977, 23.3219) // Sofia by default
 
     val initialPosition = userLocation ?: fallbackPosition
 
@@ -87,7 +91,7 @@ fun PlacesMapScreen(
         position = CameraPosition.fromLatLngZoom(initialPosition, 6f)
     }
 
-    // Ако по-късно получим userLocation, премества камерата към нея
+    // Move camera to user location when we get it
     LaunchedEffect(userLocation) {
         userLocation?.let { loc ->
             cameraPositionState.animate(
@@ -117,13 +121,17 @@ fun PlacesMapScreen(
                 isMyLocationEnabled = isLocationPermissionGranted
             )
         ) {
-            // Маркери за местата от базата
-            state.places.forEach { place ->
-                val pos = LatLng(place.latitude, place.longitude)
+            placesWithCoords.forEach { place ->
+                val pos = LatLng(place.latitude!!, place.longitude!!)
+                val snippet = listOfNotNull(
+                    listOfNotNull(place.city, place.country).takeIf { it.isNotEmpty() }?.joinToString(", "),
+                    place.description
+                ).joinToString(" • ")
+
                 Marker(
                     state = MarkerState(position = pos),
                     title = place.name,
-                    snippet = place.description
+                    snippet = if (snippet.isBlank()) null else snippet
                 )
             }
         }
